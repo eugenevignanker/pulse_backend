@@ -11,8 +11,9 @@ This repository contains the project baseline and API/security design. REST forw
 - **Runtime:** Python 3.11+ with FastAPI, HTTPX, and WebSockets support.
 - **Initial persistence:** filesystem-backed JSON records, stored outside version control under `var/`. Each token has its own record in `var/tokens/`.
 - **Migration path:** repository interfaces isolate persistence so SQLite can replace filesystem stores when indexed queries, concurrent writers, transactions, or operational scale require it.
-- **Secrets:** never store plaintext passwords or Alpaca credentials in the repository. Store only encrypted credential material or secret-manager references in local records.
-- **WebSocket:** clients use a bearer token in Alpaca-shaped `auth` frames; the proxy verifies it, then authenticates upstream using server-side Alpaca credentials. Details are in [docs/websocket-protocol.md](docs/websocket-protocol.md).
+- **Secrets:** never store plaintext passwords or Alpaca credentials in the repository. V1 uses one deployment-owned Alpaca key/secret from environment variables or a secret manager; it is never sent to clients.
+- **WebSocket:** clients use a bearer token in Alpaca-shaped `auth` frames; the proxy verifies it, then authenticates upstream with the fixed server-side Alpaca credentials. Details are in [docs/websocket-protocol.md](docs/websocket-protocol.md).
+- **Future multi-account support:** a user-to-Alpaca-credential mapping can be added behind a credential-provider interface after v1, without changing the client token protocol.
 
 ## Local setup
 

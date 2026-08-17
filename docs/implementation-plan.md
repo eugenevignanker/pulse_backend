@@ -4,12 +4,12 @@
 
 ## Objective
 
-Build a server that presents the REST and WebSocket behavior expected by Alpaca Trading API clients while adding first-party username/password authentication and bearer-token enforcement. The client must never receive Alpaca API credentials.
+Build a server that presents the REST and WebSocket behavior expected by Alpaca Trading API clients while adding first-party username/password authentication and bearer-token enforcement. V1 forwards all authorized upstream requests with one fixed, deployment-owned Alpaca key/secret. The client must never receive those credentials.
 
 - Preserve Alpaca endpoint paths, methods, query parameters, JSON names, status codes, and material error semantics.
 - Add `POST /auth/login` and authoritative `POST /auth/verify`.
 - Verify every protected request before any upstream call.
-- Keep per-user Alpaca credentials only on the server.
+- Keep the fixed Alpaca credential pair only on the server.
 - Support authenticated `/stream` `trade_updates`.
 
 ## Chosen implementation baseline
@@ -17,7 +17,7 @@ Build a server that presents the REST and WebSocket behavior expected by Alpaca 
 - **Language/framework:** Python 3.11+, FastAPI, HTTPX, and WebSockets.
 - **Persistence:** filesystem records initially. Token records live one-per-file beneath an ignored service-owned directory. Repository abstractions must permit a SQLite implementation without route changes.
 - **Token format:** opaque `ptk_<random>.<HMAC signature>` bearer tokens. Validate a keyed digest, signature, expiry, status, and scopes. Do not persist raw tokens.
-- **Credentials:** user-to-Alpaca mappings are server controlled. Password hashes use Argon2id (bcrypt only if necessary). Alpaca values are encrypted at rest or stored as secret-manager references, never plaintext in Git or client responses.
+- **Credentials:** v1 reads one Alpaca API key ID and secret from deployment configuration or a secret manager. Password hashes use Argon2id (bcrypt only if necessary). No Alpaca credential is stored in Git or returned to clients.
 - **WebSocket:** use the precise bearer-token `auth` protocol in [websocket-protocol.md](websocket-protocol.md). It mirrors Alpaca's required command ordering while the proxy performs the upstream Alpaca credential exchange.
 
 ## Authentication requirements
@@ -32,9 +32,11 @@ Build a server that presents the REST and WebSocket behavior expected by Alpaca 
 
 Every protected HTTP request must carry one well-formed bearer token. Middleware verifies it exactly once in the normal successful path, rejects missing/invalid tokens with `401`, insufficient scopes with `403`, and fails closed with `503` if the verifier is unavailable. Login, verifier service traffic, and health checks are the only exceptions.
 
-## User-to-Alpaca mapping
+## Upstream credentials and future user mapping
 
-The server maps immutable `user_id` to `alpaca_environment`, encrypted `alpaca_api_key_id`, encrypted `alpaca_api_secret`, enabled state, and allowed scopes. A caller can never choose this mapping via request body, headers, query strings, or WebSocket data. Support credential rotation independently of user login.
+For v1, every verified proxy user is served through the same configured Alpaca paper or live account. The proxy uses `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET` only when it calls Alpaca; it does not derive upstream credentials from the proxy token or any client request field.
+
+A future version may add a server-controlled mapping from immutable `user_id` to `alpaca_environment`, encrypted `alpaca_api_key_id`, and encrypted `alpaca_api_secret`. Introduce it through a credential-provider interface, preserve client token behavior, and never permit selection through request bodies, headers, query strings, or WebSocket data.
 
 ## Version 1 API surface
 
@@ -42,7 +44,7 @@ P0: `GET /v2/account`, `GET/POST /v2/orders`, `GET/PATCH/DELETE /v2/orders/{orde
 
 P1: account configurations, cancel-all orders, close positions, calendar, and all-position close. Each route must be checked against the current official Alpaca schema and receive a contract test before implementation.
 
-Use `https://paper-api.alpaca.markets` for paper mappings and `https://api.alpaca.markets` for live mappings. Apply explicit connection/read timeouts. Preserve safe upstream response codes/bodies and never retry non-idempotent order requests without an explicit idempotency design.
+Use `https://paper-api.alpaca.markets` for a paper deployment and `https://api.alpaca.markets` for a live deployment. Apply explicit connection/read timeouts. Preserve safe upstream response codes/bodies and never retry non-idempotent order requests without an explicit idempotency design.
 
 ## Local error contract
 

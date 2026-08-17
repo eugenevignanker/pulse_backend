@@ -1,6 +1,6 @@
 # WebSocket authentication protocol
 
-The proxy exposes `wss://<proxy-host>/stream`, matching Alpaca's trade-update stream path. It bridges to Alpaca's `wss://paper-api.alpaca.markets/stream` or `wss://api.alpaca.markets/stream` using credentials selected only from the authenticated user's server-side mapping.
+The proxy exposes `wss://<proxy-host>/stream`, matching Alpaca's trade-update stream path. In v1 it bridges to Alpaca's `wss://paper-api.alpaca.markets/stream` or `wss://api.alpaca.markets/stream` using one fixed, deployment-owned Alpaca credential pair. It does not use client-provided or user-specific Alpaca credentials.
 
 ## Client protocol
 
@@ -36,8 +36,8 @@ Only `trade_updates` is supported in v1. The proxy verifies the token again befo
 
 1. Parse and validate the `auth` frame.
 2. Look up the token record by a keyed digest, validate its signature and expiry, and confirm it is not revoked or disabled.
-3. Resolve the token's immutable `user_id` to a server-side Alpaca mapping.
-4. Open the upstream socket and send Alpaca's required native credentials from that mapping:
+3. Confirm the authenticated user is permitted to access trading through the proxy.
+4. Open the upstream socket and send Alpaca's required native credentials from the deployment configuration:
 
    ```json
    {"action":"auth","key":"<alpaca-key-id>","secret":"<alpaca-secret>"}
@@ -46,7 +46,7 @@ Only `trade_updates` is supported in v1. The proxy verifies the token again befo
 5. Never forward this upstream frame to the client. Bridge the upstream success event as the proxy success event.
 6. Track expiry; close with `4401` at expiry or immediately after revocation is observed during a control-command recheck.
 
-The proxy does not accept Alpaca key IDs or secrets from URL parameters, headers, or frames. A client cannot select an Alpaca account or environment.
+The proxy does not accept Alpaca key IDs or secrets from URL parameters, headers, or frames. A client cannot select an Alpaca account or environment. A later credential-provider abstraction may select a per-user pair, but that is explicitly out of scope for v1 and must not change this client protocol.
 
 ## Token records
 
