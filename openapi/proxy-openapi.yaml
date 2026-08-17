@@ -22,7 +22,12 @@ paths:
                 username: {type: string}
                 password: {type: string, format: password}
       responses:
-        '200': {description: Bearer token issued}
+        '200':
+          description: Bearer token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
         '401': {$ref: '#/components/responses/AuthInvalid'}
         '429': {description: Login rate limited}
   /auth/verify:
@@ -93,6 +98,20 @@ components:
       type: http
       scheme: bearer
       bearerFormat: opaque proxy token
+  schemas:
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, expires_in, user]
+      properties:
+        access_token: {type: string}
+        token_type: {type: string, example: Bearer}
+        expires_in: {type: integer, example: 3600}
+        user:
+          type: object
+          required: [id, username]
+          properties:
+            id: {type: string}
+            username: {type: string}
   responses:
     AuthInvalid:
       description: Missing, invalid, expired, or revoked proxy token

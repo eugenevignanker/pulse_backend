@@ -5,7 +5,9 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 
 from pulse_proxy.alpaca.client import AlpacaTradingClient
+from pulse_proxy.auth.rate_limit import LoginRateLimiter
 from pulse_proxy.auth.tokens import TokenIdentity, TokenStore
+from pulse_proxy.auth.users import FilesystemUserStore
 from pulse_proxy.config import Settings
 from pulse_proxy.errors import ProxyError
 
@@ -24,6 +26,14 @@ def get_token_store(request: Request) -> TokenStore:
         signing_key=signing_key.get_secret_value(),
         ttl_seconds=settings.token_ttl_seconds,
     )
+
+
+def get_user_store(request: Request) -> FilesystemUserStore:
+    return FilesystemUserStore(get_settings(request).user_store_path)
+
+
+def get_login_rate_limiter(request: Request) -> LoginRateLimiter:
+    return request.app.state.login_rate_limiter
 
 
 def get_alpaca_client(request: Request) -> AlpacaTradingClient:

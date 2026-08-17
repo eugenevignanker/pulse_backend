@@ -33,13 +33,29 @@ The starter application exposes `GET /health/live` and `GET /health/ready`. Do n
 
 ## SDK smoke test
 
-After installing the `dev` dependencies and starting the proxy, run the Alpaca SDK smoke test with a proxy-issued token:
+After installing the `dev` dependencies and starting the proxy, run the Alpaca SDK smoke test. It prompts for the local proxy username and password, then exchanges them for a short-lived proxy token:
 
 ```bash
-PULSE_PROXY_TOKEN='<proxy-token>' python scripts/test_account_with_alpaca_client.py
+python scripts/test_account_with_alpaca_client.py
 ```
 
-The script uses `TradingClient(oauth_token=..., url_override=...)`. Do not use fake Alpaca key/secret values for this request: the proxy intentionally accepts only its own bearer token and supplies the fixed Alpaca credentials upstream.
+For non-interactive use, set `PULSE_PROXY_USERNAME` and `PULSE_PROXY_PASSWORD`; set `PULSE_PROXY_URL` to override the default local URL. The script uses `TradingClient(oauth_token=..., url_override=...)`. Do not use fake Alpaca key/secret values for this request: the proxy intentionally accepts only its own bearer token and supplies the fixed Alpaca credentials upstream.
+
+## Local user and login
+
+Create a filesystem-backed local user (the password is stored only as an Argon2id hash):
+
+```bash
+.venv/bin/python scripts/create_user.py --username user@example.com
+```
+
+Then obtain an access token:
+
+```bash
+.venv/bin/python -c "import httpx; print(httpx.post('http://127.0.0.1:8000/auth/login', json={'username':'user@example.com','password':'<password>'}).json())"
+```
+
+Use the returned `access_token` as `PULSE_PROXY_TOKEN`. The user and token records live under ignored `var/users/` and `var/tokens/` directories; neither contains plaintext passwords or raw tokens.
 
 ## Layout
 

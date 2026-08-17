@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     token_ttl_seconds: int = 3600
+    login_rate_limit_per_minute: int = 5
     token_store_path: Path = Path("var/tokens")
     user_store_path: Path = Path("var/users")
     proxy_token_signing_key: SecretStr | None = None

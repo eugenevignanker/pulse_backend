@@ -1,10 +1,9 @@
-"""Invoke the proxy's GET /v2/account endpoint through alpaca-py.
-
-Run the proxy first, then set PULSE_PROXY_TOKEN to a proxy-issued token with
-the trading:read scope. No Alpaca key or secret is supplied to this client.
-"""
+"""Log in to the proxy, then invoke GET /v2/account through alpaca-py."""
 
 import os
+from getpass import getpass
+
+import httpx
 
 try:
     from alpaca.trading.client import TradingClient
@@ -16,11 +15,20 @@ except ModuleNotFoundError as error:
 
 
 def main() -> None:
-    token = os.environ.get("PULSE_PROXY_TOKEN")
-    if not token:
-        raise SystemExit("PULSE_PROXY_TOKEN must contain a proxy bearer token")
-
     proxy_url = os.environ.get("PULSE_PROXY_URL", "http://127.0.0.1:8000")
+    username = os.environ.get("PULSE_PROXY_USERNAME") or input("Username: ")
+    password = os.environ.get("PULSE_PROXY_PASSWORD") or getpass("Password: ")
+    try:
+        login_response = httpx.post(
+            f"{proxy_url.rstrip('/')}/auth/login",
+            json={"username": username, "password": password},
+            timeout=10,
+        )
+        login_response.raise_for_status()
+        token = login_response.json()["access_token"]
+    except (httpx.HTTPError, KeyError, ValueError) as error:
+        raise SystemExit(f"proxy login failed: {error}") from error
+
     client = TradingClient(
         oauth_token=token,
         paper=True,

@@ -5,17 +5,44 @@ from uuid import uuid4
 import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 
 from pulse_proxy.alpaca.client import AlpacaResponse, AlpacaTradingClient
-from pulse_proxy.auth.tokens import TokenIdentity
+from pulse_proxy.auth.rate_limit import LoginRateLimiter
+from pulse_proxy.auth.tokens import TokenIdentity, TokenStore
+from pulse_proxy.auth.users import FilesystemUserStore
 from pulse_proxy.config import Settings
-from pulse_proxy.dependencies import get_alpaca_client, require_trading_read
+from pulse_proxy.dependencies import (
+    get_alpaca_client,
+    get_login_rate_limiter,
+    get_token_store,
+    get_user_store,
+    require_trading_read,
+)
 from pulse_proxy.errors import ProxyError
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginUser(BaseModel):
+    id: str
+    username: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+    user: LoginUser
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Pulse Alpaca Compatibility Proxy", version="0.1.0")
     app.state.settings = settings or Settings()
+    app.state.login_rate_limiter = LoginRateLimiter(app.state.settings.login_rate_limit_per_minute)
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):
@@ -42,6 +69,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def liveness() -> dict[str, str]:
         """Return process liveness without consulting dependencies."""
         return {"status": "ok"}
+
+    @app.post("/auth/login", tags=["auth"], response_model=LoginResponse)
+    async def login(
+        payload: LoginRequest,
+        request: Request,
+        user_store: FilesystemUserStore = Depends(get_user_store),
+        token_store: TokenStore = Depends(get_token_store),
+        rate_limiter: LoginRateLimiter = Depends(get_login_rate_limiter),
+    ) -> LoginResponse:
+        """Validate local credentials and issue a proxy bearer token."""
+        source_address = request.client.host if request.client else "unknown"
+        if not rate_limiter.allow(payload.username, source_address):
+            raise ProxyError(429, "AUTH_RATE_LIMITED", "Too many login attempts")
+        user = user_store.find_by_username(payload.username)
+        if user is None or not user.enabled or not user_store.verify_password(user, payload.password):
+            rate_limiter.record_failure(payload.username, source_address)
+            raise ProxyError(401, "AUTH_CREDENTIALS_INVALID", "Invalid username or password")
+        rate_limiter.reset(payload.username, source_address)
+        token = token_store.issue(user_id=user.user_id, username=user.username, scopes=set(user.scopes))
+        return LoginResponse(
+            access_token=token,
+            expires_in=app.state.settings.token_ttl_seconds,
+            user=LoginUser(id=user.user_id, username=user.username),
+        )
 
     @app.get("/health/ready", tags=["health"])
     async def readiness() -> dict[str, str]:
