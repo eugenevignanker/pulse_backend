@@ -4,7 +4,7 @@ An in-progress Python service that exposes an Alpaca Trading API-compatible REST
 
 ## Current status
 
-This repository contains the project baseline and API/security design. REST forwarding, login, token persistence, credential resolution, and the WebSocket bridge have not yet been implemented.
+This repository contains the project baseline and API/security design. `GET /v2/account` is implemented as the first protected REST route; login, production user provisioning, and the WebSocket bridge remain to be implemented.
 
 ## Design decisions
 
@@ -28,6 +28,18 @@ pytest
 ```
 
 The starter application exposes `GET /health/live` and `GET /health/ready`. Do not put real credentials in `.env` or commit runtime files.
+
+`GET /v2/account` requires `Authorization: Bearer <proxy-token>` with the `trading:read` scope, `PROXY_TOKEN_SIGNING_KEY`, `ALPACA_API_KEY_ID`, and `ALPACA_API_SECRET`. It forwards to the selected Alpaca environment and returns Alpaca's response unchanged, apart from never exposing upstream credentials.
+
+## SDK smoke test
+
+After installing the `dev` dependencies and starting the proxy, run the Alpaca SDK smoke test with a proxy-issued token:
+
+```bash
+PULSE_PROXY_TOKEN='<proxy-token>' python scripts/test_account_with_alpaca_client.py
+```
+
+The script uses `TradingClient(oauth_token=..., url_override=...)`. Do not use fake Alpaca key/secret values for this request: the proxy intentionally accepts only its own bearer token and supplies the fixed Alpaca credentials upstream.
 
 ## Layout
 

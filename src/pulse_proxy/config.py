@@ -1,6 +1,7 @@
 """Application configuration loaded from environment variables."""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,8 @@ class Settings(BaseSettings):
     token_ttl_seconds: int = 3600
     token_store_path: Path = Path("var/tokens")
     user_store_path: Path = Path("var/users")
+    proxy_token_signing_key: SecretStr | None = None
+    alpaca_environment: Literal["paper", "live"] = "paper"
     alpaca_paper_base_url: str = "https://paper-api.alpaca.markets"
     alpaca_live_base_url: str = "https://api.alpaca.markets"
     alpaca_api_key_id: str | None = None

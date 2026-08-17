@@ -50,6 +50,10 @@ paths:
   /v2/account:
     get:
       summary: Alpaca-compatible account endpoint
+      description: >-
+        Forwards GET /v2/account to the configured Alpaca paper or live API
+        with fixed server-side credentials. The caller must supply a proxy token
+        with the trading:read scope.
       security: [{bearerAuth: []}]
       responses:
         '200': {description: Alpaca account response; schema to be synchronized from official reference}
