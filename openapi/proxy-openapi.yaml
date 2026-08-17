@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: Pulse Alpaca Compatibility Proxy
+  version: 0.1.0
+  description: >-
+    Initial contract for first-party authentication and Alpaca-compatible routes.
+    Alpaca-facing schemas are completed route-by-route from current official references.
+servers:
+  - url: https://proxy.example.com
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate with a username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: {type: string}
+                password: {type: string, format: password}
+      responses:
+        '200': {description: Bearer token issued}
+        '401': {$ref: '#/components/responses/AuthInvalid'}
+        '429': {description: Login rate limited}
+  /auth/verify:
+    post:
+      summary: Verify a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+      responses:
+        '200': {description: Token verification result}
+  /health/live:
+    get:
+      responses:
+        '200': {description: Process is live}
+  /health/ready:
+    get:
+      responses:
+        '200': {description: Service dependencies are ready}
+  /v2/account:
+    get:
+      summary: Alpaca-compatible account endpoint
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Alpaca account response; schema to be synchronized from official reference}
+        '401': {$ref: '#/components/responses/AuthInvalid'}
+  /v2/orders:
+    get:
+      summary: List Alpaca orders
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Alpaca orders response}
+    post:
+      summary: Create an Alpaca order
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Alpaca order response}
+  /v2/orders/{order_id}:
+    parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      summary: Get an Alpaca order
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: Alpaca order response}}
+    patch:
+      summary: Replace an Alpaca order
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: Alpaca order response}}
+    delete:
+      summary: Cancel an Alpaca order
+      security: [{bearerAuth: []}]
+      responses: {'204': {description: Order cancellation accepted}}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque proxy token
+  responses:
+    AuthInvalid:
+      description: Missing, invalid, expired, or revoked proxy token
